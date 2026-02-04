@@ -5,11 +5,16 @@ import os
 from datetime import datetime
 
 # Configuração da página
-st.set_page_config(page_title="Teste DISC Profissional", layout="wide")
+st.set_page_config(page_title="Portal DISC - Equipe", layout="wide")
 DB_FILE = "dados_disc_v2.csv"
 
-# Dicionário de adjetivos baseados na metodologia DISC
-# Cada linha contém uma opção para D, I, S e C respectivamente
+# LISTA ATUALIZADA DE COLABORADORES
+COLABORADORES = [
+    "Daniel", "Danilo", "Francielle", "Hency", "Lucas", "Marco", 
+    "Mateus", "Natan", "Paulo", "Rick", "Silvana", "Thiago"
+]
+
+# Dicionário de adjetivos DISC
 QUESTOES = [
     {"D": "Determinado", "I": "Persuasivo", "S": "Gentil", "C": "Habilidoso"},
     {"D": "Competitivo", "I": "Entusiasta", "S": "Paciente", "C": "Lógico"},
@@ -31,72 +36,78 @@ def carregar_dados():
 def gerar_radar(valores, nome):
     categorias = ['Dominância', 'Influência', 'Estabilidade', 'Conformidade']
     fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=valores, theta=categorias, fill='toself', name=nome))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), showlegend=False)
+    fig.add_trace(go.Scatterpolar(
+        r=valores + [valores[0]],
+        theta=categorias + [categorias[0]],
+        fill='toself',
+        line=dict(color='#636EFA'),
+        name=nome
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
+        showlegend=False,
+        title=f"Perfil de {nome}"
+    )
     return fig
 
-st.title("📊 Avaliação de Perfil DISC")
+st.title("📊 Avaliação de Perfil DISC - Time")
 
-aba_form, aba_dashboard = st.tabs(["📝 Realizar Teste", "📈 Análise do Time"])
+aba_form, aba_dashboard = st.tabs(["📝 Realizar Teste", "📈 Painel do Gestor"])
 
 with aba_form:
-    st.header("Escolha a palavra que melhor descreve você em cada grupo:")
-    
+    st.header("Formulário Comportamental")
     with st.form("teste_disc"):
-        nome_user = st.selectbox("Selecione seu nome", ["Ana", "Bruno", "Caio", "Duda", "Enzo", "Fernanda", "Guto", "Helô", "Igor", "Julia"])
+        nome_user = st.selectbox("Selecione seu nome:", sorted(COLABORADORES))
+        st.divider()
         
-        # Dicionário para armazenar os pontos
         pontos = {"D": 0, "I": 0, "S": 0, "C": 0}
         
-        # Gerar as perguntas baseadas no dicionário QUESTOES
         for i, q in enumerate(QUESTOES):
-            st.write(f"**Grupo {i+1}**")
-            # Misturamos as opções para não ficarem sempre na mesma ordem (D, I, S, C)
+            st.write(f"**Questão {i+1}:** Qual palavra melhor descreve você?")
             opcoes = [q["D"], q["I"], q["S"], q["C"]]
-            escolha = st.radio(f"Qual dessas palavras mais se aplica a você?", opcoes, key=f"q{i}", horizontal=True)
+            escolha = st.radio("", opcoes, key=f"q{i}", horizontal=True, label_visibility="collapsed")
             
-            # Atribuir ponto à categoria correta
             if escolha == q["D"]: pontos["D"] += 1
             elif escolha == q["I"]: pontos["I"] += 1
             elif escolha == q["S"]: pontos["S"] += 1
             elif escolha == q["C"]: pontos["C"] += 1
         
-        enviado = st.form_submit_button("Finalizar e Salvar Perfil")
+        enviado = st.form_submit_button("Salvar Minha Avaliação")
         
         if enviado:
             perfil_dom = max(pontos, key=pontos.get)
-            data_atual = datetime.now().strftime('%d/%m/%Y')
-            
+            data_atual = datetime.now().strftime('%Y-%m-%d')
             novo_dado = pd.DataFrame([[nome_user, data_atual, pontos['D'], pontos['I'], pontos['S'], pontos['C'], perfil_dom]], 
                                      columns=['Nome', 'Data', 'D', 'I', 'S', 'C', 'Perfil'])
-            
             novo_dado.to_csv(DB_FILE, mode='a', header=not os.path.exists(DB_FILE), index=False)
-            
-            st.success(f"Obrigado, {nome_user}! Seu perfil predominante é: {perfil_dom}")
+            st.success(f"Excelente, {nome_user}! Seus dados foram salvos.")
             st.plotly_chart(gerar_radar([pontos['D'], pontos['I'], pontos['S'], pontos['C']], nome_user))
 
 with aba_dashboard:
     df = carregar_dados()
     if not df.empty:
-        st.header("Dashboard de Evolução do Time")
+        # Visão Geral do Time
+        st.header("Análise do Time")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Média D", round(df['D'].mean(), 1))
+        col2.metric("Média I", round(df['I'].mean(), 1))
+        col3.metric("Média S", round(df['S'].mean(), 1))
+        col4.metric("Média C", round(df['C'].mean(), 1))
         
-        # Filtro por colaborador
-        colab = st.selectbox("Ver histórico de:", df['Nome'].unique())
-        df_colab = df[df['Nome'] == colab]
+        st.divider()
+        colab = st.selectbox("Filtrar por Colaborador:", sorted(df['Nome'].unique()))
+        df_colab = df[df['Nome'] == colab].sort_values('Data')
         
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.write(f"### Último Perfil: {df_colab.iloc[-1]['Perfil']}")
-            st.plotly_chart(gerar_radar([df_colab.iloc[-1]['D'], df_colab.iloc[-1]['I'], df_colab.iloc[-1]['S'], df_colab.iloc[-1]['C']], colab))
-        
-        with col2:
-            st.write("### Evolução ao longo do tempo")
-            df_colab_display = df_colab.set_index('Data')[['D', 'I', 'S', 'C']]
-            st.line_chart(df_colab_display)
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.subheader("Perfil Atual")
+            ultimo = df_colab.iloc[-1]
+            st.plotly_chart(gerar_radar([ultimo['D'], ultimo['I'], ultimo['S'], ultimo['C']], colab))
+        with c2:
+            st.subheader("Evolução Temporal")
+            st.line_chart(df_colab.set_index('Data')[['D', 'I', 'S', 'C']])
             
-        st.write("---")
-        # Botão de Backup para você não perder os dados online
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Baixar Planilha de Dados Atualizada", csv, "dados_disc.csv", "text/csv")
+        st.download_button("📥 Baixar Planilha Geral", csv, "dados_equipe_disc.csv", "text/csv")
     else:
-        st.info("Nenhuma resposta registrada ainda.")
+        st.info("Aguardando as primeiras respostas do time...")
