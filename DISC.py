@@ -28,7 +28,7 @@ with aba_form:
     st.write("Responda de 0 a 10 o quanto você se identifica com cada pilar:")
     
     with st.form("disc_form"):
-        nome = st.selectbox("Selecione seu nome", ["Ana", "Bruno", "Caio", "Duda", "Enzo", "Fernanda", "Guto", "Helô", "Igor", "Julia"])
+        nome = st.selectbox("Selecione seu nome", ["Daniel", "Danilo", "Francielle", "Hency", "Lucas", "Marco", "Mateus", "Natan", "Rick", "Silvana", "Thiago"])
         data = st.date_input("Data da avaliação")
         
         col1, col2 = st.columns(2)
